@@ -52,7 +52,7 @@ const EditorDemo = () => {
   // Dummy run (replace with API call)
   const handleRun = async() => {
     setLoading(true)
-    const response=await fetch("http://localhost:3000/run",{
+    const response=await fetch("https://web-socket-server-9zh4.onrender.com/run",{
       method:"POST",
       headers:{
         "content-type":"application/json"
