@@ -1,135 +1,147 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Editor from "@monaco-editor/react";
-import socket from "../socket/socket"
-import UsersList from "../pages/UsersList";
+import socket from "../socket/socket";
+import { useLocation, useParams } from "react-router-dom";
+import "../styles/Editor.css";
 
 const EditorDemo = () => {
-  const [code, setCode] = useState("console.log('Hello')");
+  const languages = [
+    "javascript",
+    "typescript",
+    "html",
+    "css",
+    "java",
+    "python",
+  ];
+
+  const codeTemplates = {
+    javascript: "console.log('Hello');",
+    typescript: "let x: number = 10;\nconsole.log(x);",
+    html: "<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Hello</h1>\n  </body>\n</html>",
+    css: "body {\n  margin: 0;\n}",
+    java:
+      "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello\");\n  }\n}",
+    python: "print('Hello')",
+  };
+
+  const { roomId } = useParams();
+  const { state } = useLocation();
+  const userName = state?.userName;
+  const[loading,setLoading]=useState(false)
+  const [language, setLanguage] = useState("javascript");
+  const [code, setCode] = useState(codeTemplates.javascript);
   const [output, setOutput] = useState("");
-  const [room, setRoom] = useState("");
-  const [users, setUsers] = useState([]);
+  const [status, setStatus] = useState("");
 
-  const isRemoteChange = useRef(false);
-
-  /* -------------------- JOIN ROOM ON LOAD -------------------- */
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user"));
+    if (!roomId || !userName) return;
+    socket.emit("join-room", { roomId, userName });
+  }, [roomId, userName]);
 
-    if (user?.roomId) {
-      socket.emit("join-room", {
-        roomId: user.roomId,
-        userName: user.userName,
-      });
-      setRoom(user.roomId);
-    }
-  }, []);
-
-  /* -------------------- RECEIVE USERS -------------------- */
-  useEffect(() => {
-    const handleRoomUsers = (usersList) => {
-      console.log("Users in room:", usersList);
-      setUsers(usersList);
-    };
-
-    socket.on("room-users", handleRoomUsers);
-
-    return () => {
-      socket.off("room-users", handleRoomUsers);
-    };
-  }, []); // ✅ NO dependencies
-
-  /* -------------------- RECEIVE CODE -------------------- */
-  useEffect(() => {
-    const handleReceiveCode = (data) => {
-      isRemoteChange.current = true;
-      setCode(data.code);
-    };
-
-    socket.on("receive-code", handleReceiveCode);
-
-    return () => {
-      socket.off("receive-code", handleReceiveCode);
-    };
-  }, []);
-
-  /* -------------------- CODE CHANGE -------------------- */
-  const changeCode = (value) => {
-    if (value === undefined) return;
-
+  const handleChange = (value) => {
     setCode(value);
-
-    if (isRemoteChange.current) {
-      isRemoteChange.current = false;
-      return;
-    }
-
-    if (room) {
-      socket.emit("change-code", {
-        roomId: room,
-        code: value,
-      });
-    }
+    socket.emit("code-change", { roomId, code: value });
   };
 
-  /* -------------------- RUN CODE -------------------- */
-  const runCode = () => {
-    try {
-      let logs = [];
-      const originalLog = console.log;
+  const handleLanguageChange = (e) => {
+    const lang = e.target.value;
+    setLanguage(lang);
+    setCode(codeTemplates[lang]);
+  };
 
-      console.log = (...args) => {
-        logs.push(args.join(" "));
-      };
-
-      eval(code);
-
-      console.log = originalLog;
-      setOutput(logs.join("\n") || "No output");
-    } catch (err) {
-      setOutput(err.message);
+  // Dummy run (replace with API call)
+  const handleRun = async() => {
+    setLoading(true)
+    const response=await fetch("http://localhost:3000/run",{
+      method:"POST",
+      headers:{
+        "content-type":"application/json"
+      },
+      body:JSON.stringify({language,code})
+    })
+    if(response.status===200){
+      const data=await response.json();
+      setStatus(data.status)
+      setOutput(data.output);
+      setLoading(false)
     }
   };
-
-  /* -------------------- LEAVE ROOM -------------------- */
-  const leaveRoomHandler = () => {
-    if (!room) return;
-
-    socket.emit("leave-room", room);
-
-    setRoom("");
-    setUsers([]);
-    setCode("// Left the room");
-  };
-
-  /* -------------------- CLEANUP ON UNMOUNT -------------------- */
-  useEffect(() => {
-    return () => {
-      if (room) {
-        socket.emit("leave-room", room);
-      }
-    };
-  }, [room]);
 
   return (
-    <div>
-      <h3>Users in room:</h3>
-      <UsersList users={users} />
+    <div className="editor-page">
+      {/* HEADER */}
+      <div className="editor-header">
+        <div className="left">
+          <span className="user">👤 {userName}</span>
+          <span className="room">Room: {roomId}</span>
+        </div>
+        <div className="right">
+          <span className="status-online">🟢 Online</span>
+        </div>
+      </div>
 
-      <Editor
-        height="70vh"
-        language="javascript"
-        theme="vs-dark"
-        value={code}
-        onChange={changeCode}
-      />
+      {/* TOOLBAR */}
+      <div className="editor-toolbar">
+        <select
+          className="language-select"
+          value={language}
+          onChange={handleLanguageChange}
+        >
+          {languages.map((lang) => (
+            <option key={lang} value={lang}>
+              {lang.toUpperCase()}
+            </option>
+          ))}
+        </select>
 
-      <br />
+        <button className="run-btn" onClick={handleRun}>
+          {!loading?(<span>▶ Run</span> ):(
+            <span>Running....</span>
+          )}
+        </button>
+      </div>
 
-      <button onClick={leaveRoomHandler}>Leave Room</button>
-      <button onClick={runCode}>Run ▶️</button>
+      {/* MAIN */}
+      <div className="editor-main">
+        {/* CODE EDITOR */}
+        <div className="editor-wrapper">
+          <Editor
+            height="100%"
+            theme="vs-dark"
+            language={language}
+            value={code}
+            onChange={handleChange}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              autoClosingBrackets: "always",
+              autoIndent: "full",
+              quickSuggestions: false, // LeetCode style
+              suggestOnTriggerCharacters: false,
+            }}
+          />
+        </div>
 
-      <p>Output:</p>
-      <pre>{output}</pre>
+        {/* OUTPUT */}
+        <div className="output-wrapper">
+          <div className="output-header">
+            Output
+            {status && (
+              <span
+                className={
+                  status === "success"
+                    ? "output-success"
+                    : "output-error"
+                }
+              >
+                {status}
+              </span>
+            )}
+          </div>
+
+          <pre className="output-box">{output || "Run code to see output"}</pre>
+        </div>
+      </div>
     </div>
   );
 };

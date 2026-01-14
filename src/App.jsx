@@ -10,6 +10,7 @@ const App = () => {
 
       <Route path='/chatpage/:roomId' element={<ChatPage/>}/>
       <Route path='/' element={<RoomJoin/>}/>
+      <Route path='/editor/:roomId' element={<EditorDemo/>}/>
     </Routes>
     </BrowserRouter>
   )

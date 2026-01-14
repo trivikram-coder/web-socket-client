@@ -9,7 +9,7 @@ const RoomJoin = () => {
     e.preventDefault();
     
 
-    navigate(`/chatpage/${roomId}`,{state:{userName}})
+    navigate(`/editor/${roomId}`,{state:{userName}})
   }
   return (
     <div>
