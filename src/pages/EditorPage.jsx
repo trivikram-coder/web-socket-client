@@ -3,16 +3,27 @@ import EditorDemo from "./EditorDemo";
 import ChatPage from "./ChatPage";
 import UsersList from "./UsersList";
 import "../styles/EditorPage.css";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 const EditorPage = () => {
 const{roomId}=useParams();
+const navigate=useNavigate()
 const{state}=useLocation();
 const userName=state?.userName;
   const [users, setUsers] = useState([]); // already coming from socket in ChatPage
-console.log(userName)
+
   return (
-    <div className="editor-layout">
+    <>
+    {
+      !roomId || !state?(
+        <div>
+        <p>
+          Please join a room with username and id.....
+        </p>
+        <button onClick={()=>navigate("/")}>Join room</button>
+        </div>
+      ):(
+        <div className="editor-layout">
       {/* TOP BAR */}
       <div className="top-bar">
         <span className="rooms-btn">📁 Rooms</span>
@@ -37,6 +48,10 @@ console.log(userName)
         </div>
       </div>
     </div>
+      )
+    }
+    
+    </>
   );
 };
 

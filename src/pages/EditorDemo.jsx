@@ -8,12 +8,12 @@ const EditorDemo = () => {
   const languages = ["javascript", "typescript", "java", "python"];
 
   const codeTemplates = {
-    javascript: "console.log('Hello');",
+    javascript: "console.log('Hello World');",
     typescript:
       "//Sorry currently facing some issues with Ts.\n//Please prefer other languages\nlet x: number = 10;\nconsole.log(x);",
     java:
-      "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello\");\n  }\n}",
-    python: "print('Hello')",
+      "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello World\");\n  }\n}",
+    python: "print('Hello World')",
   };
 
   const { roomId } = useParams();

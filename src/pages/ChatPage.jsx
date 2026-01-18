@@ -11,7 +11,7 @@ const ChatPage = ({ setUsers: setUsersFromParent,roomId,userName }) => {
   const [chats, setChats] = useState([]);
   const[chatUsers,setChatUsers]=useState([])
   const [users, setUsers] = useState([]);
-console.log("CHAT ",userName,"Room id",roomId)
+
   const chatEndRef = useRef(null);
 
   // -------------------------
@@ -38,7 +38,7 @@ console.log("CHAT ",userName,"Room id",roomId)
     });
 
     socket.on("receive-message", (data) => {
-      console.log(data)
+ 
       setChats(data.chats || []);
     });
 
