@@ -1,15 +1,11 @@
-import React from 'react'
+const UsersList = ({ users }) => (
+  <ul className="list-group list-group-flush">
+    {users.map((u, i) => (
+      <li key={i} className="list-group-item">
+        👤 {u}
+      </li>
+    ))}
+  </ul>
+);
 
-const UsersList = ({users}) => {
-  return (
-    <div>
-      <ul>
-        {users.map((u) => (
-          <li key={u.id}>{u.userName}</li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-export default UsersList
+export default UsersList;

@@ -3,56 +3,69 @@ import "../styles/ChatPage.css";
 import socket from "../socket/socket";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-const ChatPage = () => {
-  const navigate=useNavigate()
-  const {roomId}=useParams();
-  const{state}=useLocation();
-  const userName=state?.userName;
+const ChatPage = ({ setUsers: setUsersFromParent,roomId,userName }) => {
+  const navigate = useNavigate();
+
+
   const [message, setMessage] = useState("");
-  
   const [chats, setChats] = useState([]);
+  const[chatUsers,setChatUsers]=useState([])
   const [users, setUsers] = useState([]);
-  
-  const chatEndRef=useRef(null)
-  useEffect(()=>{
-if (!roomId || !userName) return;
+console.log("CHAT ",userName,"Room id",roomId)
+  const chatEndRef = useRef(null);
 
-    socket.emit("join-room", {
-       roomId,
-      userName,
-    });
-    
-  },[roomId,userName])
-  useEffect(()=>{
-   socket.emit("get-chats",roomId)
-  },[roomId])
+  // -------------------------
+  // JOIN ROOM
+  // -------------------------
   useEffect(() => {
-    
-    socket.on("connect", () => {
-      console.log("User connected with id " + socket.id);
-    });
+    if (!roomId || !userName) return;
 
+    socket.emit("join-room", { roomId, userName });
+
+    return () => {
+      socket.emit("leave-room", { roomId, userName });
+    };
+  }, [roomId, userName]);
+
+  // -------------------------
+  // SOCKET LISTENERS
+  // -------------------------
+  useEffect(() => {
     socket.on("room-users", (data) => {
-      setUsers(data); // expects array
+      setUsers(data);
+      setChatUsers(data)
+      if (setUsersFromParent) setUsersFromParent(data);
     });
 
     socket.on("receive-message", (data) => {
-      setChats(data.chats); // expects array of messages
+      console.log(data)
+      setChats(data.chats || []);
+    });
+
+    socket.on("new-message", (msg) => {
+      setChats((prev) => [...prev, msg]);
     });
 
     return () => {
       socket.off("room-users");
       socket.off("receive-message");
+      socket.off("new-message");
     };
-  }, []);
-useEffect(() => {
+  }, [setUsersFromParent]);
+
+  // -------------------------
+  // AUTO SCROLL
+  // -------------------------
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chats]);
-  
 
-  function sendMessage() {
+  // -------------------------
+  // SEND MESSAGE
+  // -------------------------
+  const sendMessage = () => {
     if (!message.trim()) return;
-
+    if(!userName)return;
     socket.emit("send-message", {
       roomId,
       userName,
@@ -60,68 +73,70 @@ useEffect(() => {
     });
 
     setMessage("");
-  }
-  function leaveRoomHandler(){
-    if(!roomId)return;
-    socket.emit("leave-room",{roomId,userName})
-    navigate("/")
-  }
+  };
+
+  // -------------------------
+  // LEAVE ROOM
+  // -------------------------
+  const leaveRoomHandler = () => {
+    socket.emit("leave-room", { roomId, userName });
+    navigate("/");
+  };
 
   return (
-    <>
-      
-        <div className="chat-container">
-          {/* Header */}
-          <div className="chat-header">
-            <h3>Room: {roomId}</h3>
-            <span className="show-user">{userName}</span>
-            <span className="online-status">● Online</span>
-            <button onClick={leaveRoomHandler}>Leave room</button>
-          </div>
-
-          {/* Users */}
-          <div className="users-list">
-            <h4>Users</h4>
-            {users.map((u, index) => (
-              <div key={index} className="user-item">
-                {u.userName || u}
-              </div>
-            ))}
-          </div>
-
-          {/* Messages */}
-          <div className="chat-messages">
-            {chats.map((chat, index) => (
-              <div
-                key={index}
-                className={`message ${
-                  chat.userName === userName ? "sent" : "received"
-                }`}
-              >
-                <span className="user">
-                  {chat.userName === userName ? "You" : chat.userName}
-                </span>
-                <p>{chat.text || chat.message}</p>
-              </div>
-            ))}
-          {/* 👇 SCROLL TARGET */}
-          
-            <div ref={chatEndRef} />
-          </div>
-          {/* Input */}
-          <div className="chat-input">
-            <input
-              type="text"
-              placeholder="Type a message..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            />
-            <button onClick={sendMessage}>Send</button>
-          </div>
+    <div className="chat-container">
+      {/* HEADER */}
+      <div className="chat-header">
+        <h3>Room: {roomId}</h3>
+        <div className="chat-header-right">
+          <span className="show-user">{userName}</span>
+          <span className="online-status">● Online</span>
+          <button className="leave-btn" onClick={leaveRoomHandler}>
+            Leave
+          </button>
         </div>
-    
-    </>
+      </div>
+
+      {/* USERS LIST */}
+      <div className="users-list">
+        <h4>Collaborators</h4>
+        {chatUsers.map((u, index) => (
+          <div key={index} className="user-item">
+            {u}
+          </div>
+        ))}
+      </div>
+
+      {/* CHAT MESSAGES */}
+      <div className="chat-messages">
+        {chats.map((chat, index) => (
+          <div
+            key={index}
+            className={`message ${
+              chat.userName === userName ? "sent" : "received"
+            }`}
+          >
+            <span className="user">
+              {chat.userName === userName ? "You" : chat.userName}
+            </span>
+            <p>{chat.message}</p>
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* INPUT */}
+      <div className="chat-input">
+        <input
+          type="text"
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
+    </div>
   );
 };
 

@@ -5,20 +5,12 @@ import { useLocation, useParams } from "react-router-dom";
 import "../styles/Editor.css";
 
 const EditorDemo = () => {
-  const languages = [
-    "javascript",
-    "typescript",
-    "html",
-    "css",
-    "java",
-    "python",
-  ];
+  const languages = ["javascript", "typescript", "java", "python"];
 
   const codeTemplates = {
     javascript: "console.log('Hello');",
-    typescript: "let x: number = 10;\nconsole.log(x);",
-    html: "<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Hello</h1>\n  </body>\n</html>",
-    css: "body {\n  margin: 0;\n}",
+    typescript:
+      "//Sorry currently facing some issues with Ts.\n//Please prefer other languages\nlet x: number = 10;\nconsole.log(x);",
     java:
       "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello\");\n  }\n}",
     python: "print('Hello')",
@@ -27,43 +19,96 @@ const EditorDemo = () => {
   const { roomId } = useParams();
   const { state } = useLocation();
   const userName = state?.userName;
-  const[loading,setLoading]=useState(false)
+
+  const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState(codeTemplates.javascript);
   const [output, setOutput] = useState("");
   const [status, setStatus] = useState("");
 
+  // ✅ NEW: STDIN INPUT STATE
+  const [input, setInput] = useState("");
+
+  // -------------------------
+  // JOIN ROOM
+  // -------------------------
   useEffect(() => {
     if (!roomId || !userName) return;
     socket.emit("join-room", { roomId, userName });
   }, [roomId, userName]);
 
+  // -------------------------
+  // RECEIVE CODE FROM SOCKET
+  // -------------------------
+  useEffect(() => {
+    socket.on("code-sent", ({ code, language }) => {
+      setLanguage(language);
+      setCode(code);
+    });
+
+    return () => {
+      socket.off("code-sent");
+    };
+  }, []);
+
+  // -------------------------
+  // CODE CHANGE (USER TYPING)
+  // -------------------------
   const handleChange = (value) => {
+    if (value === undefined) return;
+
     setCode(value);
-    socket.emit("code-change", { roomId, code: value });
+
+    socket.emit("code-change", {
+      roomId,
+      userName,
+      code: value,
+      language,
+    });
   };
 
+  // -------------------------
+  // LANGUAGE CHANGE
+  // -------------------------
   const handleLanguageChange = (e) => {
     const lang = e.target.value;
+    const template = codeTemplates[lang];
+
     setLanguage(lang);
-    setCode(codeTemplates[lang]);
+    setCode(template);
+
+    socket.emit("code-change", {
+      roomId,
+      userName,
+      code: template,
+      language: lang,
+    });
   };
 
-  // Dummy run (replace with API call)
-  const handleRun = async() => {
-    setLoading(true)
-    const response=await fetch("https://web-socket-server-9zh4.onrender.com/run",{
-      method:"POST",
-      headers:{
-        "content-type":"application/json"
-      },
-      body:JSON.stringify({language,code})
-    })
-    if(response.status===200){
-      const data=await response.json();
-      setStatus(data.status)
+  // -------------------------
+  // RUN CODE (WITH INPUT)
+  // -------------------------
+  const handleRun = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch("https://code-runner.vkstore.site/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          code,
+          input, // ✅ SEND INPUT
+        }),
+      });
+
+      const data = await response.json();
+      setStatus(data.status);
       setOutput(data.output);
-      setLoading(false)
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,16 +139,18 @@ const EditorDemo = () => {
           ))}
         </select>
 
-        <button className="run-btn" onClick={handleRun}>
-          {!loading?(<span>▶ Run</span> ):(
-            <span>Running....</span>
-          )}
-        </button>
+        {!loading ? (
+          <button className="run-btn" onClick={handleRun}>
+            ▶ Run
+          </button>
+        ) : (
+          <span className="run-btn">Running...</span>
+        )}
       </div>
 
       {/* MAIN */}
       <div className="editor-main">
-        {/* CODE EDITOR */}
+        {/* EDITOR */}
         <div className="editor-wrapper">
           <Editor
             height="100%"
@@ -116,14 +163,24 @@ const EditorDemo = () => {
               fontSize: 14,
               autoClosingBrackets: "always",
               autoIndent: "full",
-              quickSuggestions: false, // LeetCode style
+              quickSuggestions: false,
               suggestOnTriggerCharacters: false,
             }}
           />
         </div>
 
-        {/* OUTPUT */}
+        {/* RIGHT PANEL */}
         <div className="output-wrapper">
+          {/* INPUT */}
+          <div className="output-header">Input (STDIN)</div>
+          <textarea
+            className="input-box"
+            placeholder="Enter input here (stdin)..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+
+          {/* OUTPUT */}
           <div className="output-header">
             Output
             {status && (
@@ -139,7 +196,9 @@ const EditorDemo = () => {
             )}
           </div>
 
-          <pre className="output-box">{output || "Run code to see output"}</pre>
+          <pre className="output-box">
+            {output || "Run code to see output"}
+          </pre>
         </div>
       </div>
     </div>
